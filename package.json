@@ -15,7 +15,9 @@
   "description": "",
   "dependencies": {
     "@twurple/chat": "^8.0.2",
+    "@types/nodemailer": "^7.0.5",
     "dotenv": "^17.2.3",
+    "nodemailer": "^7.0.12",
     "tmi.js": "^1.8.5"
   },
   "devDependencies": {

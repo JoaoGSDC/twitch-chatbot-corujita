@@ -51,8 +51,8 @@ export class Bot {
     });
 
     // Handler de mensagens
-    this.chatClient.onMessage((channel, user, message, msg) => {
-      this.messageHandler.handleMessage(channel, user, message, msg);
+    this.chatClient.onMessage(async (channel: string, user: string, message: string, msg: any) => {
+      await this.messageHandler.handleMessage(channel, user, message, msg);
     });
 
     // Tratamento de desconexão
@@ -61,7 +61,7 @@ export class Bot {
     });
 
     // Tratamento de erros de autenticação
-    this.chatClient.onAuthenticationFailure((msg) => {
+    this.chatClient.onAuthenticationFailure((msg: string) => {
       console.error("\n❌ ERRO DE AUTENTICAÇÃO:");
       console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.error(msg);
@@ -93,6 +93,8 @@ export class Bot {
   async connect(): Promise<void> {
     try {
       await this.chatClient.connect();
+      // Registra o tempo de início da live quando o bot conecta
+      this.messageHandler.setStreamStartTime(new Date());
     } catch (error: unknown) {
       console.error("❌ Erro ao conectar:", error);
       throw error;
