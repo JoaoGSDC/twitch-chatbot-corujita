@@ -19,14 +19,14 @@
     "@types/nodemailer": "^7.0.5",
     "dotenv": "^17.2.3",
     "nodemailer": "^7.0.12",
-    "tmi.js": "^1.8.5"
+    "tmi.js": "^1.8.5",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
     "@types/node": "^25.0.2",
     "@types/tmi.js": "^1.8.6",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "tsx": "^4.21.0"
   }
 }
