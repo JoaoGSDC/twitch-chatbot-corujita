@@ -1,9 +1,10 @@
 services:
-  - type: worker
+  - type: web
     name: twitch-chatbot-corujita
     env: node
     buildCommand: npm install && npm run build
     startCommand: node dist/index.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
