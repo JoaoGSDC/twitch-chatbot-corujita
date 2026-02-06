@@ -12,6 +12,8 @@ import { userStateManager } from "../state/UserState.js";
 export class Bot {
   private chatClient: ChatClient;
   private messageHandler: MessageHandler;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private isConnected: boolean = false;
 
   constructor() {
     // Preparar token OAuth
@@ -26,10 +28,12 @@ export class Bot {
       token
     );
 
-    // Criar cliente de chat
+    // Criar cliente de chat com opções de reconexão
     this.chatClient = new ChatClient({
       authProvider,
       channels: [config.channel],
+      // Opções para garantir estabilidade da conexão
+      requestMembershipEvents: false,
     });
 
     // Criar handler de mensagens
@@ -45,7 +49,14 @@ export class Bot {
   private setupEventHandlers(): void {
     // Evento de conexão
     this.chatClient.onConnect(() => {
-      console.log(`✅ ${config.botUsername} conectada ao canal ${config.channel}`);
+      this.isConnected = true;
+      const timestamp = new Date().toISOString();
+      console.log(`✅ [${timestamp}] ${config.botUsername} conectada ao canal ${config.channel}`);
+      // Limpa timeout de reconexão se existir
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
       // Envia mensagem de boas-vindas após 5 segundos
       this.sendWelcomeMessage();
     });
@@ -56,13 +67,31 @@ export class Bot {
     });
 
     // Tratamento de desconexão
-    this.chatClient.onDisconnect(() => {
-      console.log(`⚠️ Desconectado do chat`);
+    this.chatClient.onDisconnect((manually: boolean, reason?: Error) => {
+      this.isConnected = false;
+      const timestamp = new Date().toISOString();
+      console.log(`⚠️ [${timestamp}] Desconectado do chat`);
+      if (reason) {
+        console.log(`   Motivo: ${reason.message || reason}`);
+        if (reason.stack) {
+          console.log(`   Stack: ${reason.stack}`);
+        }
+      }
+      console.log(`   Manual: ${manually}`);
+      
+      // Tenta reconectar automaticamente após desconexão não manual
+      if (!manually) {
+        console.log("🔄 Tentando reconectar automaticamente em 5 segundos...");
+        this.reconnectTimeout = setTimeout(() => {
+          this.attemptReconnect();
+        }, 5000);
+      }
     });
 
     // Tratamento de erros de autenticação
     this.chatClient.onAuthenticationFailure((msg: string) => {
-      console.error("\n❌ ERRO DE AUTENTICAÇÃO:");
+      const timestamp = new Date().toISOString();
+      console.error(`\n❌ [${timestamp}] ERRO DE AUTENTICAÇÃO:`);
       console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.error(msg);
       console.error("\n💡 SOLUÇÃO:");
@@ -75,6 +104,27 @@ export class Bot {
       console.error("   Tokens 'app access token' não funcionam para chat!");
       console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     });
+  }
+
+  /**
+   * Tenta reconectar o bot manualmente
+   */
+  private async attemptReconnect(): Promise<void> {
+    if (this.isConnected) {
+      console.log("✅ Bot já está conectado, cancelando reconexão");
+      return;
+    }
+
+    try {
+      console.log("🔄 Tentando reconectar...");
+      await this.chatClient.connect();
+    } catch (error: unknown) {
+      console.error("❌ Erro ao reconectar:", error);
+      // Agenda nova tentativa
+      this.reconnectTimeout = setTimeout(() => {
+        this.attemptReconnect();
+      }, 10000); // 10 segundos
+    }
   }
 
   /**
@@ -92,11 +142,17 @@ export class Bot {
    */
   async connect(): Promise<void> {
     try {
+      const timestamp = new Date().toISOString();
+      console.log(`🔄 [${timestamp}] Iniciando conexão com a Twitch...`);
       await this.chatClient.connect();
+      this.isConnected = true;
       // Registra o tempo de início da live quando o bot conecta
       this.messageHandler.setStreamStartTime(new Date());
+      console.log(`✅ [${new Date().toISOString()}] Conexão estabelecida com sucesso`);
     } catch (error: unknown) {
-      console.error("❌ Erro ao conectar:", error);
+      this.isConnected = false;
+      const timestamp = new Date().toISOString();
+      console.error(`❌ [${timestamp}] Erro ao conectar:`, error);
       throw error;
     }
   }
@@ -105,7 +161,25 @@ export class Bot {
    * Desconecta o bot do chat
    */
   async disconnect(): Promise<void> {
+    const timestamp = new Date().toISOString();
+    console.log(`🛑 [${timestamp}] Desconectando bot...`);
+    
+    // Limpa timeout de reconexão
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    
+    this.isConnected = false;
     await this.chatClient.quit();
+    console.log(`✅ [${new Date().toISOString()}] Bot desconectado`);
+  }
+
+  /**
+   * Verifica se o bot está conectado
+   */
+  getIsConnected(): boolean {
+    return this.isConnected;
   }
 
   /**
